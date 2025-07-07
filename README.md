@@ -1,6 +1,6 @@
 # Bitcoin Treasury Premium Tracker
 
-A full-stack web application that tracks publicly traded companies holding Bitcoin and calculates their premium/discount to Net Asset Value (NAV). The application scrapes real-time data from BitcoinTreasuries.net, fetches live Bitcoin prices from CoinGecko, and stock prices from Yahoo Finance.
+A full-stack web application that tracks publicly traded companies holding Bitcoin and calculates their premium/discount to Net Asset Value (NAV). The application provides real-time data on Bitcoin treasury holdings with automated price updates.
 
 ![Bitcoin Treasury Premium Tracker](https://img.shields.io/badge/Bitcoin-Treasury%20Tracker-orange?logo=bitcoin)
 ![Node.js](https://img.shields.io/badge/Node.js-18+-green?logo=node.js)
@@ -8,413 +8,218 @@ A full-stack web application that tracks publicly traded companies holding Bitco
 ![TypeScript](https://img.shields.io/badge/TypeScript-5+-blue?logo=typescript)
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue?logo=docker)
 
-## 🚀 Quick Start with Docker
+## 🚀 Quick Start
 
-The fastest way to run the application is using Docker Compose:
+### Using Docker (Recommended)
 
 ```bash
 # Clone the repository
 git clone <repository-url>
 cd bitcoinpremiums.com
 
-# Start the application
-docker compose up --build
+# Start production setup
+./docker-setup.sh production
 
 # Access the application
-# Frontend: http://localhost:3000
-# Backend API: http://localhost:3001
+# Containers: Backend (localhost:3001), Frontend (localhost:3000)
+# Configure your host nginx to proxy to these containers
 ```
 
-That's it! The application will automatically:
-- Start the backend API server
-- Start the frontend React application
-- Initialize the SQLite database
-- Begin scraping and updating data every 30 minutes
+### Manual Setup
 
-## 📋 Features
+```bash
+# Backend
+cd backend
+npm install
+npm run build
+npm start
 
-### Real-Time Data Collection
-- **Company Holdings**: Scraped from BitcoinTreasuries.net every 6 hours
-- **Bitcoin Prices**: Fetched from CoinGecko API every 30 minutes
-- **Stock Prices**: Fetched from Yahoo Finance API every 30 minutes (market hours only)
-
-### Premium/Discount Calculations
-- **NAV per Share**: `(BTC Holdings × Bitcoin Price) ÷ Total Shares Outstanding`
-- **Premium/Discount**: `((Stock Price - NAV per Share) ÷ NAV per Share) × 100`
-
-### Interactive Features
-- **Sortable Table**: Click any column header to sort
-- **Auto-Refresh**: Data updates every 30 minutes
-- **Manual Refresh**: Force immediate data updates
-- **CSV Export**: Download current data as CSV
-- **Market Status**: Live NYSE market open/closed indicator
-- **Error Handling**: Graceful degradation with last known prices
+# Frontend
+cd frontend
+npm install
+npm run build
+npm start
+```
 
 ## 🏗️ Architecture
 
-### Backend (Node.js/Express/SQLite)
+### Docker + Host Nginx Setup
 ```
-backend/
-├── src/
-│   ├── controllers/    # API route handlers
-│   ├── services/       # Business logic
-│   │   ├── bitcoinPriceService.ts    # CoinGecko API integration
-│   │   ├── stockPriceService.ts      # Yahoo Finance API integration
-│   │   ├── companyService.ts         # Company data management
-│   │   └── schedulerService.ts       # Cron job scheduling
-│   ├── models/         # Database models and types
-│   ├── scrapers/       # Web scraping logic
-│   └── utils/          # Utilities (logging, etc.)
-├── tests/              # Comprehensive test suite
-└── data/               # SQLite database files
+Internet → Host Nginx → Docker Containers
+                     ├── Backend Container (localhost:3001)
+                     └── Frontend Container (localhost:3000)
 ```
 
-### Frontend (React/TypeScript/Tailwind)
-```
-frontend/
-├── src/
-│   ├── components/     # React components
-│   │   └── BitcoinTreasuryTracker.tsx
-│   ├── services/       # API client
-│   │   └── api.ts      # Axios-based API service
-│   └── App.tsx         # Main app with React Query
-└── public/             # Static assets
-```
+### Technology Stack
+- **Backend**: Node.js, Express, TypeScript, SQLite
+- **Frontend**: React 18, TypeScript, Tailwind CSS, React Query
+- **Data Sources**: CoinGecko API, Yahoo Finance API, Bitcoin Treasuries data
+- **Deployment**: Docker with host nginx reverse proxy
 
-### Database Schema
-```sql
-companies (
-  id INTEGER PRIMARY KEY,
-  name TEXT NOT NULL,
-  ticker TEXT UNIQUE NOT NULL,
-  exchange TEXT,
-  country_code TEXT,
-  btc_holdings REAL,
-  shares_outstanding REAL,
-  last_holdings_update TEXT
-)
+## ⚙️ Configuration
 
-stock_prices (
-  id INTEGER PRIMARY KEY,
-  ticker TEXT NOT NULL,
-  price REAL NOT NULL,
-  currency TEXT DEFAULT 'USD',
-  timestamp TEXT DEFAULT CURRENT_TIMESTAMP
-)
+### Single Environment File
+All configuration is managed through one `.env` file:
 
-bitcoin_prices (
-  id INTEGER PRIMARY KEY,
-  price REAL NOT NULL,
-  currency TEXT DEFAULT 'USD',
-  timestamp TEXT DEFAULT CURRENT_TIMESTAMP
-)
-```
-
-## 🛠️ Development Setup
-
-### Prerequisites
-- Node.js 18+
-- npm or yarn
-- Docker & Docker Compose (for containerized setup)
-
-### Local Development (without Docker)
-
-#### Backend Setup
 ```bash
-cd backend
-npm install
-cp .env.example .env  # Configure environment variables
-npm run dev           # Start development server on port 3001
+# Domain Configuration
+DOMAIN=premiums.cypherpunk.cloud
+REACT_APP_API_URL=https://premiums.cypherpunk.cloud/api
+
+# Container Ports
+BACKEND_PORT=3001
+FRONTEND_PORT=3000
+
+# API Configuration
+BITCOIN_PRICE_UPDATE_INTERVAL=30
+STOCK_PRICE_UPDATE_INTERVAL=30
+HOLDINGS_UPDATE_INTERVAL=360
 ```
 
-#### Frontend Setup
+### Host Nginx Configuration
+Use the provided `host-nginx.conf` file for your nginx setup:
+
 ```bash
-cd frontend
-npm install
-npm start            # Start development server on port 3000
+# Copy nginx configuration
+sudo cp host-nginx.conf /etc/nginx/sites-available/premiums.cypherpunk.cloud
+sudo ln -s /etc/nginx/sites-available/premiums.cypherpunk.cloud /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
-#### Running Tests
+## 📊 Features
+
+### Real-time Data
+- **Bitcoin Price**: Updated every 30 minutes from CoinGecko
+- **Stock Prices**: Updated every 30 minutes from Yahoo Finance
+- **Holdings Data**: Updated every 6 hours from Bitcoin treasuries sources
+
+### Calculated Metrics
+- **NAV per Share**: (BTC Holdings × Bitcoin Price) ÷ Shares Outstanding
+- **Premium/Discount**: ((Stock Price - NAV per Share) ÷ NAV per Share) × 100
+- **Market Capitalization**: Stock Price × Shares Outstanding
+- **BTC Value**: BTC Holdings × Current Bitcoin Price
+
+### User Interface
+- **Sortable Tables**: Click headers to sort by any column
+- **Real-time Updates**: Automatic data refresh every 30 minutes
+- **Export Functionality**: Download data as CSV
+- **Market Status**: Shows if US stock market is open/closed
+- **Responsive Design**: Works on desktop and mobile
+
+## 🔧 Development
+
+### Environment Setup
+```bash
+# Use development configuration
+cp .env.development .env
+./docker-setup.sh development
+```
+
+### Testing
 ```bash
 # Backend tests
 cd backend
 npm test
 
-# Frontend tests
+# Frontend tests  
 cd frontend
 npm test
 ```
 
-### Docker Development
+### Hot Reload Development
+The docker setup includes live reload for both frontend and backend when using development mode.
 
-#### Build and run with Docker Compose
-```bash
-# Development with hot reload
-docker compose -f docker-compose.dev.yml up --build
+## 📋 API Endpoints
 
-# Production build
-docker compose up --build
-
-# Run in background
-docker compose up -d
-
-# View logs
-docker compose logs -f
-
-# Stop services
-docker compose down
-```
-
-#### Individual container builds
-```bash
-# Build backend
-docker build -t bitcoin-treasury-backend ./backend
-
-# Build frontend
-docker build -t bitcoin-treasury-frontend ./frontend
-
-# Run backend
-docker run -p 3001:3001 bitcoin-treasury-backend
-
-# Run frontend
-docker run -p 3000:3000 bitcoin-treasury-frontend
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-#### Backend (.env)
-```env
-# Server Configuration
-PORT=3001
-NODE_ENV=production
-
-# Database
-DATABASE_PATH=./data/treasury.db
-
-# API Configuration
-COINGECKO_API_URL=https://api.coingecko.com/api/v3
-YAHOO_FINANCE_API_URL=https://query1.finance.yahoo.com/v8/finance
-
-# Scraping Configuration
-BITCOIN_TREASURIES_URL=https://bitcointreasuries.net
-USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
-
-# Update Intervals (in minutes)
-BITCOIN_PRICE_UPDATE_INTERVAL=30
-STOCK_PRICE_UPDATE_INTERVAL=30
-HOLDINGS_UPDATE_INTERVAL=360
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
-```
-
-#### Frontend
-```env
-REACT_APP_API_URL=http://localhost:3001/api
-```
-
-## 📊 API Documentation
-
-### Endpoints
-
-#### Companies
 - `GET /api/companies` - Get all companies with calculated metrics
 - `GET /api/companies/:ticker` - Get specific company data
-
-#### Prices
 - `GET /api/bitcoin-price` - Get current Bitcoin price
-- `GET /api/price-history?hours=24` - Get historical price data
-
-#### System
 - `GET /api/market-status` - Check if US stock market is open
 - `POST /api/update-prices` - Manually trigger price updates
 - `GET /health` - Health check endpoint
 
-### Response Format
-```json
-{
-  "success": true,
-  "data": {
-    // Response data
-  },
-  "timestamp": "2025-01-06T12:00:00.000Z"
-}
+## 🛡️ Security Features
+
+- **Rate Limiting**: API requests are rate limited
+- **CORS Protection**: Configured for specific domains
+- **Input Validation**: All API inputs are validated
+- **Security Headers**: Nginx adds security headers
+- **Hidden Backend**: API only accessible through reverse proxy
+
+## 🔄 Data Update Schedule
+
+| Component | Frequency | Condition |
+|-----------|-----------|-----------|
+| Bitcoin Price | 30 minutes | Always |
+| Stock Prices | 30 minutes | Market hours |
+| Stock Prices | 2 hours | Market closed |
+| Holdings Data | 6 hours | Always |
+
+## 📁 Project Structure
+
 ```
-
-### Error Response
-```json
-{
-  "success": false,
-  "error": "Error message",
-  "timestamp": "2025-01-06T12:00:00.000Z"
-}
-```
-
-## 🧪 Testing
-
-### Backend Tests
-- **Unit Tests**: Services, utilities, and business logic
-- **Integration Tests**: API endpoints and database operations
-- **Mocked APIs**: External API calls are mocked for reliability
-
-```bash
-cd backend
-npm test                 # Run all tests
-npm run test:watch       # Run tests in watch mode
-npm run test:coverage    # Run with coverage report
-```
-
-### Frontend Tests
-- **Component Tests**: React component rendering and interactions
-- **API Tests**: Service layer and data fetching
-
-```bash
-cd frontend
-npm test                 # Run all tests
-npm run test:coverage    # Run with coverage report
+├── .env                          # Single configuration file
+├── docker-compose.yml            # Docker services definition
+├── docker-setup.sh               # Automated setup script
+├── host-nginx.conf               # Host nginx configuration
+├── backend/
+│   ├── src/
+│   │   ├── controllers/          # API route handlers
+│   │   ├── services/            # Business logic
+│   │   ├── models/              # Database and types
+│   │   └── utils/               # Utilities
+│   └── tests/                   # Backend tests
+└── frontend/
+    ├── src/
+    │   ├── components/          # React components
+    │   ├── services/            # API client
+    │   └── tests/               # Frontend tests
+    └── public/                  # Static assets
 ```
 
 ## 🚀 Deployment
 
-### Production Deployment with Docker
+### Production Deployment
+1. Configure your domain in `.env`
+2. Start Docker containers: `./docker-setup.sh production`
+3. Setup host nginx: Copy and enable `host-nginx.conf`
+4. Configure SSL certificates (optional)
 
-#### Using Docker Compose (Recommended)
-```bash
-# Production deployment
-docker compose -f docker-compose.prod.yml up -d
+### Environment Variables for Production
+Update these in your `.env` file:
+- `DOMAIN`: Your production domain
+- `REACT_APP_API_URL`: API URL through your nginx
+- `RATE_LIMIT_MAX_REQUESTS`: Increase for production load
 
-# Monitor logs
-docker compose -f docker-compose.prod.yml logs -f
-```
+## 📖 Documentation
 
-#### Manual Docker Deployment
-```bash
-# Build production images
-docker build -t bitcoin-treasury-backend:prod ./backend
-docker build -t bitcoin-treasury-frontend:prod ./frontend
-
-# Run with production settings
-docker run -d -p 3001:3001 --name backend bitcoin-treasury-backend:prod
-docker run -d -p 3000:3000 --name frontend bitcoin-treasury-frontend:prod
-```
-
-### Cloud Deployment Options
-
-#### Backend Deployment (Railway/Fly.io)
-1. Set environment variables in deployment platform
-2. Ensure persistent storage for SQLite database
-3. Configure health check endpoint: `/health`
-
-#### Frontend Deployment (Vercel/Netlify)
-1. Build command: `npm run build`
-2. Output directory: `build`
-3. Set API URL environment variable
-
-### Environment-Specific Configurations
-
-#### Production
-- Set `NODE_ENV=production`
-- Configure proper CORS origins
-- Set up log rotation
-- Monitor database size
-
-#### Staging
-- Use separate database
-- Enable debug logging
-- Test with production-like data
-
-## 📈 Monitoring & Maintenance
-
-### Health Monitoring
-- **Health Check**: `GET /health` endpoint
-- **Database Status**: Monitor SQLite file size and growth
-- **API Limits**: Track external API usage
-- **Update Success**: Monitor cron job execution
-
-### Logs
-- **Backend Logs**: `backend/logs/` directory
-- **Error Logs**: `backend/logs/error.log`
-- **Combined Logs**: `backend/logs/combined.log`
-
-### Database Maintenance
-```bash
-# Access SQLite database
-sqlite3 backend/data/treasury.db
-
-# Check table sizes
-.tables
-SELECT COUNT(*) FROM companies;
-SELECT COUNT(*) FROM stock_prices;
-SELECT COUNT(*) FROM bitcoin_prices;
-
-# Clean old price data (older than 30 days)
-DELETE FROM stock_prices WHERE timestamp < datetime('now', '-30 days');
-DELETE FROM bitcoin_prices WHERE timestamp < datetime('now', '-30 days');
-```
+- **CLAUDE.md**: Detailed project instructions and architecture
+- **DOCKER-HOST-NGINX.md**: Complete Docker + nginx setup guide
+- **PRD.md**: Product requirements document
 
 ## 🤝 Contributing
 
-### Development Workflow
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make changes and add tests
-4. Run tests: `npm test`
-5. Commit changes: `git commit -m 'Add amazing feature'`
-6. Push to branch: `git push origin feature/amazing-feature`
-7. Open a Pull Request
-
-### Code Standards
-- **TypeScript**: Strict mode enabled
-- **ESLint**: Follow configured rules
-- **Testing**: Maintain test coverage above 80%
-- **Documentation**: Update README for new features
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## ⚠️ Disclaimer
 
-This application is for educational and informational purposes only. The data provided should not be used as the sole basis for investment decisions. Always verify data independently and consult with financial professionals before making investment decisions.
+This application is for educational and informational purposes only. Always verify data independently before making investment decisions. The calculated premiums and discounts are based on available public data and may not reflect real-time market conditions.
 
-## 🆘 Troubleshooting
+## 🔗 Data Sources
 
-### Common Issues
-
-#### Docker Build Fails
-```bash
-# Clear Docker cache
-docker system prune -a
-docker compose down
-docker compose up --build
-```
-
-#### Database Issues
-```bash
-# Reset database (WARNING: This deletes all data)
-rm backend/data/treasury.db
-docker compose restart backend
-```
-
-#### API Rate Limits
-- CoinGecko: 10-30 calls/minute (free tier)
-- Yahoo Finance: No official limits, but be respectful
-- Check logs for rate limit errors
-
-#### Frontend Not Loading
-- Verify backend is running on port 3001
-- Check network connectivity between containers
-- Verify CORS configuration
-
-### Getting Help
-1. Check the [Issues](https://github.com/your-repo/issues) page
-2. Review application logs
-3. Verify API endpoints manually
-4. Check Docker container status: `docker compose ps`
+- **Bitcoin Prices**: [CoinGecko API](https://www.coingecko.com/en/api)
+- **Stock Prices**: [Yahoo Finance API](https://finance.yahoo.com/)
+- **Holdings Data**: Bitcoin treasuries public sources
 
 ---
 
-**Built with ❤️ for the Bitcoin community**
+**Live Demo**: [https://premiums.cypherpunk.cloud](https://premiums.cypherpunk.cloud)

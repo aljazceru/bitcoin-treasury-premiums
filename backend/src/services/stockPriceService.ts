@@ -11,11 +11,13 @@ export class StockPriceService {
   }
 
   async fetchStockPrice(ticker: string): Promise<{ price: number; sharesOutstanding?: number }> {
+    let lastError: Error;
+
+    // Try primary Yahoo Finance API v8 endpoint
     try {
-      // Yahoo Finance API v8 endpoint
       const response = await axios.get(`${this.yahooFinanceUrl}/chart/${ticker}`, {
         headers: {
-          'User-Agent': process.env.USER_AGENT || 'Mozilla/5.0'
+          'User-Agent': process.env.USER_AGENT || 'Mozilla/5.0 (compatible; BTC-Treasury-Bot/1.0)'
         },
         timeout: 10000
       });
@@ -33,35 +35,50 @@ export class StockPriceService {
         throw new Error(`No price data found for ticker ${ticker}`);
       }
 
+      logger.info(`Fetched stock price for ${ticker}: $${price}`);
       return { price, sharesOutstanding };
 
     } catch (error) {
-      // Fallback to alternative Yahoo Finance endpoint
-      try {
-        const altResponse = await axios.get(`https://finance.yahoo.com/quote/${ticker}`, {
-          headers: {
-            'User-Agent': process.env.USER_AGENT || 'Mozilla/5.0'
-          },
-          timeout: 10000
-        });
-
-        // Parse price from HTML (as a fallback)
-        const priceMatch = altResponse.data.match(/regularMarketPrice":{"raw":(\d+\.?\d*)/);
-        const sharesMatch = altResponse.data.match(/sharesOutstanding":{"raw":(\d+)/);
-        
-        if (priceMatch) {
-          return {
-            price: parseFloat(priceMatch[1]),
-            sharesOutstanding: sharesMatch ? parseInt(sharesMatch[1]) : undefined
-          };
-        }
-      } catch (altError) {
-        logger.error(`Error fetching stock price for ${ticker}:`, altError);
-      }
-
-      logger.error(`Error fetching stock price for ${ticker}:`, error);
-      throw error;
+      lastError = error as Error;
+      logger.warn(`Primary API failed for ${ticker}, trying fallback:`, error);
     }
+
+    // Fallback to alternative Yahoo Finance endpoint
+    try {
+      const altResponse = await axios.get(`https://finance.yahoo.com/quote/${ticker}`, {
+        headers: {
+          'User-Agent': process.env.USER_AGENT || 'Mozilla/5.0 (compatible; BTC-Treasury-Bot/1.0)'
+        },
+        timeout: 10000
+      });
+
+      // Parse price from HTML (as a fallback)
+      const priceMatch = altResponse.data.match(/regularMarketPrice":{"raw":(\d+\.?\d*)/);
+      const sharesMatch = altResponse.data.match(/sharesOutstanding":{"raw":(\d+)/);
+      
+      if (priceMatch) {
+        const price = parseFloat(priceMatch[1]);
+        const sharesOutstanding = sharesMatch ? parseInt(sharesMatch[1]) : undefined;
+        logger.info(`Fetched stock price for ${ticker} via fallback: $${price}`);
+        return { price, sharesOutstanding };
+      }
+    } catch (altError) {
+      logger.error(`Fallback API also failed for ${ticker}:`, altError);
+    }
+
+    // Try to get last known price as final fallback
+    try {
+      const lastPrice = await this.getLastPrice(ticker);
+      if (lastPrice) {
+        logger.warn(`Using last known price for ${ticker}: $${lastPrice.price}`);
+        return { price: lastPrice.price };
+      }
+    } catch (dbError) {
+      logger.error(`Failed to get last known price for ${ticker}:`, dbError);
+    }
+
+    logger.error(`All attempts failed for ${ticker}`);
+    throw new Error(`Failed to fetch stock price for ${ticker}: ${lastError.message}`);
   }
 
   async updateStockPrice(ticker: string): Promise<StockPrice> {

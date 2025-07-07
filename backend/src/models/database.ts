@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 export class Database {
   private db!: sqlite3.Database;
   private dbPath: string;
+  private isInitialized = false;
 
   constructor(dbPath?: string) {
     this.dbPath = dbPath || process.env.DATABASE_PATH || './data/treasury.db';
@@ -34,8 +35,12 @@ export class Database {
   }
 
   async initialize(): Promise<void> {
+    if (this.isInitialized) {
+      return;
+    }
     await this.connect();
     await this.createTables();
+    this.isInitialized = true;
   }
 
   private async createTables(): Promise<void> {
@@ -69,13 +74,28 @@ export class Database {
         timestamp TEXT DEFAULT CURRENT_TIMESTAMP
       )`,
       
+      // Schema version tracking
+      `CREATE TABLE IF NOT EXISTS schema_version (
+        version INTEGER PRIMARY KEY,
+        applied_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )`,
+      
       `CREATE INDEX IF NOT EXISTS idx_stock_prices_ticker ON stock_prices(ticker)`,
       `CREATE INDEX IF NOT EXISTS idx_stock_prices_timestamp ON stock_prices(timestamp)`,
-      `CREATE INDEX IF NOT EXISTS idx_bitcoin_prices_timestamp ON bitcoin_prices(timestamp)`
+      `CREATE INDEX IF NOT EXISTS idx_bitcoin_prices_timestamp ON bitcoin_prices(timestamp)`,
+      `CREATE INDEX IF NOT EXISTS idx_companies_ticker ON companies(ticker)`,
+      `CREATE INDEX IF NOT EXISTS idx_companies_btc_holdings ON companies(btc_holdings)`
     ];
 
     for (const query of queries) {
       await this.run(query);
+    }
+    
+    // Set initial schema version if not exists
+    const currentVersion = await this.get<{ version: number }>('SELECT MAX(version) as version FROM schema_version');
+    if (!currentVersion || currentVersion.version === null) {
+      await this.run('INSERT INTO schema_version (version) VALUES (1)');
+      logger.info('Database schema version 1 initialized');
     }
     
     logger.info('Database tables created successfully');
@@ -120,6 +140,34 @@ export class Database {
     });
   }
 
+  async transaction<T>(operations: (db: sqlite3.Database) => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.db.serialize(() => {
+        this.db.run('BEGIN TRANSACTION');
+        
+        operations(this.db)
+          .then(result => {
+            this.db.run('COMMIT', (err) => {
+              if (err) {
+                logger.error('Transaction commit error:', err);
+                reject(err);
+              } else {
+                resolve(result);
+              }
+            });
+          })
+          .catch(error => {
+            this.db.run('ROLLBACK', (rollbackErr) => {
+              if (rollbackErr) {
+                logger.error('Transaction rollback error:', rollbackErr);
+              }
+              reject(error);
+            });
+          });
+      });
+    });
+  }
+
   async close(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.db.close((err) => {
@@ -128,6 +176,7 @@ export class Database {
           reject(err);
         } else {
           logger.info('Database connection closed');
+          this.isInitialized = false;
           resolve();
         }
       });

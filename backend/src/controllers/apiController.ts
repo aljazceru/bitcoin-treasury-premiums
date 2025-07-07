@@ -31,7 +31,30 @@ export class ApiController {
   async getCompany(req: Request, res: Response): Promise<void> {
     try {
       const { ticker } = req.params;
-      const company = await companyService.getCompanyByTicker(ticker.toUpperCase());
+      
+      // Input validation
+      if (!ticker || typeof ticker !== 'string' || ticker.trim().length === 0) {
+        const response: APIResponse<any> = {
+          success: false,
+          error: 'Invalid ticker symbol',
+          timestamp: new Date().toISOString()
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      const normalizedTicker = ticker.trim().toUpperCase();
+      if (normalizedTicker.length > 10) {
+        const response: APIResponse<any> = {
+          success: false,
+          error: 'Ticker symbol too long',
+          timestamp: new Date().toISOString()
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      const company = await companyService.getCompanyByTicker(normalizedTicker);
       
       if (!company) {
         const response: APIResponse<any> = {
@@ -44,7 +67,7 @@ export class ApiController {
       }
 
       // Get latest stock price
-      const stockPrice = await stockPriceService.getLastPrice(ticker.toUpperCase());
+      const stockPrice = await stockPriceService.getLastPrice(normalizedTicker);
       const btcPrice = await bitcoinPriceService.getLastPrice();
 
       const response: APIResponse<any> = {
@@ -105,6 +128,17 @@ export class ApiController {
     try {
       const { hours = '24' } = req.query;
       const hoursNum = parseInt(hours as string);
+      
+      // Input validation
+      if (isNaN(hoursNum) || hoursNum < 1 || hoursNum > 8760) { // Max 1 year
+        const response: APIResponse<any> = {
+          success: false,
+          error: 'Invalid hours parameter. Must be between 1 and 8760',
+          timestamp: new Date().toISOString()
+        };
+        res.status(400).json(response);
+        return;
+      }
       
       const btcHistory = await bitcoinPriceService.getPriceHistory(hoursNum);
       

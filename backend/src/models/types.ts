@@ -30,8 +30,9 @@ export interface TreasuryData extends Company {
   stock_price?: number;
   market_cap?: number;
   btc_value?: number;
-  nav_per_share?: number;
-  premium?: number;
+  btc_nav_multiple?: number;  // Market cap divided by value of BTC holdings
+  btc_per_share?: number;     // BTC holdings divided by shares outstanding
+  btc_holdings_percentage?: number; // BTC holdings as a percentage of market cap
 }
 
 export interface APIResponse<T> {

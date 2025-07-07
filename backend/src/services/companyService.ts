@@ -100,8 +100,11 @@ export class CompanyService {
       if (company.stock_price && company.shares_outstanding) {
         company.market_cap = company.stock_price * company.shares_outstanding * 1000000;
         company.btc_value = company.btc_holdings * btcPrice.price;
-        company.nav_per_share = company.btc_value / (company.shares_outstanding * 1000000);
-        company.premium = ((company.stock_price - company.nav_per_share) / company.nav_per_share) * 100;
+        
+        // New metrics replacing NAV calculation
+        company.btc_nav_multiple = company.btc_value > 0 ? company.market_cap / company.btc_value : 0;
+        company.btc_per_share = company.btc_holdings / (company.shares_outstanding * 1000000);
+        company.btc_holdings_percentage = company.market_cap > 0 ? (company.btc_value / company.market_cap) * 100 : 0;
       }
       return company;
     });

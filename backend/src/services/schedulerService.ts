@@ -22,14 +22,28 @@ export class SchedulerService {
     });
     this.tasks.push(btcTask);
 
-    // Update stock prices every 30 minutes (always, regardless of market hours)
+    // Update stock prices every 30 minutes during market hours, every 2 hours when closed
     const stockUpdateInterval = process.env.STOCK_PRICE_UPDATE_INTERVAL || '30';
     const stockCronExpression = `*/${stockUpdateInterval} * * * *`;
     
     const stockTask = cron.schedule(stockCronExpression, async () => {
-      logger.info('Running scheduled stock price update');
+      const isMarketOpen = stockPriceService.isMarketOpen();
+      logger.info(`Running scheduled stock price update (market ${isMarketOpen ? 'open' : 'closed'})`);
+      
       try {
-        await stockPriceService.updateAllStockPrices();
+        if (isMarketOpen) {
+          // Update all stock prices when market is open
+          await stockPriceService.updateAllStockPrices();
+        } else {
+          // When market is closed, only update major holdings every 2 hours
+          const currentHour = new Date().getHours();
+          if (currentHour % 2 === 0) {
+            logger.info('Updating major holdings during market closure');
+            await stockPriceService.updateAllStockPrices();
+          } else {
+            logger.info('Skipping stock price update (market closed, not scheduled hour)');
+          }
+        }
       } catch (error) {
         logger.error('Failed to update stock prices:', error);
       }
@@ -53,7 +67,7 @@ export class SchedulerService {
 
     logger.info('Scheduler service started with the following tasks:');
     logger.info(`- Bitcoin price update: every ${btcUpdateInterval} minutes`);
-    logger.info(`- Stock price update: every ${stockUpdateInterval} minutes (always)`);
+    logger.info(`- Stock price update: every ${stockUpdateInterval} minutes (market hours), every 2 hours (market closed)`);
     logger.info(`- Holdings update: every ${holdingsHours} hours`);
 
     // Run initial updates
@@ -74,7 +88,7 @@ export class SchedulerService {
       // Then update Bitcoin price
       await bitcoinPriceService.updatePrice();
       
-      // Finally update stock prices (always, regardless of market hours)
+      // Finally update stock prices
       logger.info('Fetching initial stock prices...');
       await stockPriceService.updateAllStockPrices();
     } catch (error) {

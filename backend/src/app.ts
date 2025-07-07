@@ -12,10 +12,26 @@ export function createApp(): Application {
   app.use(helmet());
 
   // CORS configuration
-  app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true
-  }));
+  if (process.env.NODE_ENV === 'development') {
+    // Development: Allow specific origins
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:5173', // Vite dev server
+      process.env.FRONTEND_URL
+    ].filter((origin): origin is string => Boolean(origin));
+
+    app.use(cors({
+      origin: allowedOrigins,
+      credentials: true
+    }));
+  } else {
+    // Production: Backend is behind reverse proxy, no CORS needed
+    // All requests come from the same domain via nginx
+    app.use(cors({
+      origin: true, // Accept all origins since requests come through reverse proxy
+      credentials: true
+    }));
+  }
 
   // Body parsing middleware
   app.use(express.json());

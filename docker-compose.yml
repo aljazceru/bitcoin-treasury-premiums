@@ -5,44 +5,52 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: bitcoin-treasury-backend
+      args:
+        - NODE_ENV=${NODE_ENV}
+    container_name: ${COMPOSE_PROJECT_NAME}-backend
     ports:
-      - "3001:3001"
+      - "${BACKEND_PORT}:${BACKEND_PORT}"
     environment:
-      - NODE_ENV=production
-      - PORT=3001
-      - DATABASE_PATH=/app/data/treasury.db
-      - COINGECKO_API_URL=https://api.coingecko.com/api/v3
-      - YAHOO_FINANCE_API_URL=https://query1.finance.yahoo.com/v8/finance
-      - BITCOIN_TREASURIES_URL=https://bitcointreasuries.net
-      - USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
-      - BITCOIN_PRICE_UPDATE_INTERVAL=30
-      - STOCK_PRICE_UPDATE_INTERVAL=30
-      - HOLDINGS_UPDATE_INTERVAL=360
-      - RATE_LIMIT_WINDOW_MS=900000
-      - RATE_LIMIT_MAX_REQUESTS=100
+      - NODE_ENV=${NODE_ENV}
+      - PORT=${BACKEND_PORT}
+      - DATABASE_PATH=${DATABASE_PATH}
+      - COINGECKO_API_URL=${COINGECKO_API_URL}
+      - YAHOO_FINANCE_API_URL=${YAHOO_FINANCE_API_URL}
+      - BITCOIN_TREASURIES_URL=${BITCOIN_TREASURIES_URL}
+      - USER_AGENT=${USER_AGENT}
+      - BITCOIN_PRICE_UPDATE_INTERVAL=${BITCOIN_PRICE_UPDATE_INTERVAL}
+      - STOCK_PRICE_UPDATE_INTERVAL=${STOCK_PRICE_UPDATE_INTERVAL}
+      - HOLDINGS_UPDATE_INTERVAL=${HOLDINGS_UPDATE_INTERVAL}
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS}
+      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - LOG_LEVEL=${LOG_LEVEL}
     volumes:
-      - backend_data:/app/data
-      - backend_logs:/app/logs
+      - ${BACKEND_DATA_PATH}:/app/data
+      - ${BACKEND_LOGS_PATH}:/app/logs
     networks:
       - bitcoin-treasury-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      interval: ${HEALTH_CHECK_INTERVAL}
+      timeout: ${HEALTH_CHECK_TIMEOUT}
+      retries: ${HEALTH_CHECK_RETRIES}
+      start_period: ${HEALTH_CHECK_START_PERIOD}
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: bitcoin-treasury-frontend
+      args:
+        - REACT_APP_API_URL=${REACT_APP_API_URL}
+        - NODE_ENV=${NODE_ENV}
+    container_name: ${COMPOSE_PROJECT_NAME}-frontend
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT}:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:3001/api
+      - REACT_APP_API_URL=${REACT_APP_API_URL}
+      - NODE_ENV=${NODE_ENV}
     depends_on:
       backend:
         condition: service_healthy
@@ -50,17 +58,11 @@ services:
       - bitcoin-treasury-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
-
-volumes:
-  backend_data:
-    driver: local
-  backend_logs:
-    driver: local
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: ${HEALTH_CHECK_INTERVAL}
+      timeout: ${HEALTH_CHECK_TIMEOUT}
+      retries: ${HEALTH_CHECK_RETRIES}
+      start_period: ${HEALTH_CHECK_START_PERIOD}
 
 networks:
   bitcoin-treasury-network:

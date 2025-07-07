@@ -8,6 +8,21 @@ import { seedDatabase } from './utils/seedData';
 // Load environment variables
 dotenv.config();
 
+// Validate critical environment variables
+const requiredEnvVars = {
+  NODE_ENV: process.env.NODE_ENV || 'development',
+};
+
+// Log environment configuration
+logger.info('Environment configuration loaded:', {
+  NODE_ENV: requiredEnvVars.NODE_ENV,
+  PORT: process.env.PORT || 3001,
+  DATABASE_PATH: process.env.DATABASE_PATH || './data/treasury.db',
+  BITCOIN_PRICE_UPDATE_INTERVAL: process.env.BITCOIN_PRICE_UPDATE_INTERVAL || '30',
+  STOCK_PRICE_UPDATE_INTERVAL: process.env.STOCK_PRICE_UPDATE_INTERVAL || '30',
+  HOLDINGS_UPDATE_INTERVAL: process.env.HOLDINGS_UPDATE_INTERVAL || '360'
+});
+
 const PORT = process.env.PORT || 3001;
 
 async function startServer() {

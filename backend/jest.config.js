@@ -13,5 +13,9 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1'
   },
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts']
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  testTimeout: 30000, // 30 seconds for memory leak tests
+  logHeapUsage: true, // Enable memory monitoring
+  // Expose garbage collector for manual triggering in tests
+  setupFiles: ['<rootDir>/tests/jest.setup.js']
 };

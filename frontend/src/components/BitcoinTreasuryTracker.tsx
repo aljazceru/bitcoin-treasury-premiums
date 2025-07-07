@@ -63,6 +63,32 @@ const BitcoinTreasuryTracker: React.FC = () => {
     });
   }, [companies, sortConfig]);
 
+  // Memoize summary calculations
+  const summaryStats = React.useMemo(() => {
+    if (!sortedCompanies.length) {
+      return {
+        totalCompanies: 0,
+        totalBtcHoldings: 0,
+        totalBtcValue: 0,
+        avgBtcNavMultiple: 0
+      };
+    }
+
+    const totalBtcHoldings = sortedCompanies.reduce((sum, c) => sum + c.btc_holdings, 0);
+    const totalBtcValue = sortedCompanies.reduce((sum, c) => sum + (c.btc_value || 0), 0);
+    const validMultiples = sortedCompanies.filter(c => c.btc_nav_multiple !== null && c.btc_nav_multiple !== undefined);
+    const avgBtcNavMultiple = validMultiples.length > 0 
+      ? validMultiples.reduce((sum, c) => sum + (c.btc_nav_multiple || 0), 0) / validMultiples.length 
+      : 0;
+
+    return {
+      totalCompanies: sortedCompanies.length,
+      totalBtcHoldings,
+      totalBtcValue,
+      avgBtcNavMultiple
+    };
+  }, [sortedCompanies]);
+
   const handleSort = (key: keyof Company) => {
     setSortConfig(current => ({
       key,
@@ -90,26 +116,31 @@ const BitcoinTreasuryTracker: React.FC = () => {
   };
 
   const exportToCSV = () => {
-    const headers = ['Company', 'Ticker', 'BTC Holdings', 'Stock Price', 'Premium/Discount', 'NAV/Share', 'BTC Value', 'Market Cap'];
+    const headers = ['Company', 'Ticker', 'BTC Holdings', 'Stock Price', 'BTC NAV Multiple', 'BTC per Share', 'BTC Holdings %', 'BTC Value', 'Market Cap'];
     const csvData = sortedCompanies.map(company => [
-      company.name,
+      `"${company.name}"`,
       company.ticker,
       company.btc_holdings,
       company.stock_price || 'N/A',
-      company.premium || 'N/A',
-      company.nav_per_share || 'N/A',
+      company.btc_nav_multiple ? `${company.btc_nav_multiple.toFixed(2)}x` : 'N/A',
+      company.btc_per_share ? `${company.btc_per_share.toFixed(6)}` : 'N/A',
+      company.btc_holdings_percentage ? `${company.btc_holdings_percentage.toFixed(1)}%` : 'N/A',
       company.btc_value || 'N/A',
       company.market_cap || 'N/A'
     ]);
     
-    const csvContent = [headers, ...csvData].map(row => row.join(',')).join('\\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const csvContent = [headers, ...csvData].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'bitcoin-treasury-premiums.csv';
+    a.download = `bitcoin-treasury-premiums-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
-    window.URL.revokeObjectURL(url);
+    
+    // Clean up
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+    }, 100);
   };
 
   const formatNumber = (num: number | null | undefined, decimals = 2): string => {
@@ -130,19 +161,6 @@ const BitcoinTreasuryTracker: React.FC = () => {
     }).format(num);
   };
 
-  const formatPercent = (num: number | null | undefined): JSX.Element => {
-    if (num == null) return <span>N/A</span>;
-    
-    const color = num >= 0 ? 'text-green-600' : 'text-red-600';
-    const icon = num >= 0 ? <TrendingUp className="w-4 h-4 inline" /> : <TrendingDown className="w-4 h-4 inline" />;
-    
-    return (
-      <span className={`font-semibold ${color} flex items-center gap-1`}>
-        {icon}
-        {formatNumber(num, 1)}%
-      </span>
-    );
-  };
 
   const getCountryFlag = (countryCode: string | undefined): string => {
     const flags: Record<string, string> = {
@@ -257,25 +275,25 @@ const BitcoinTreasuryTracker: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg shadow">
           <div className="text-sm text-gray-500">Total Companies</div>
-          <div className="text-2xl font-bold">{sortedCompanies.length}</div>
+          <div className="text-2xl font-bold">{summaryStats.totalCompanies}</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">
           <div className="text-sm text-gray-500">Total BTC Holdings</div>
           <div className="text-2xl font-bold">
-            ₿{formatNumber(sortedCompanies.reduce((sum, c) => sum + c.btc_holdings, 0), 0)}
+            ₿{formatNumber(summaryStats.totalBtcHoldings, 0)}
           </div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">
           <div className="text-sm text-gray-500">Total BTC Value</div>
           <div className="text-2xl font-bold">
-            {formatCurrency(sortedCompanies.reduce((sum, c) => sum + (c.btc_value || 0), 0))}
+            {formatCurrency(summaryStats.totalBtcValue)}
           </div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">
-          <div className="text-sm text-gray-500">Avg Premium</div>
+          <div className="text-sm text-gray-500">Avg BTC NAV Multiple</div>
           <div className="text-2xl font-bold">
-            {sortedCompanies.length > 0 ? 
-              formatNumber(sortedCompanies.reduce((sum, c) => sum + (c.premium || 0), 0) / sortedCompanies.length, 1) + '%' 
+            {summaryStats.totalCompanies > 0 ? 
+              formatNumber(summaryStats.avgBtcNavMultiple, 1) + 'x' 
               : 'N/A'
             }
           </div>
@@ -293,8 +311,9 @@ const BitcoinTreasuryTracker: React.FC = () => {
                   { key: 'ticker' as keyof Company, label: 'Ticker' },
                   { key: 'btc_holdings' as keyof Company, label: 'BTC Holdings' },
                   { key: 'stock_price' as keyof Company, label: 'Stock Price' },
-                  { key: 'premium' as keyof Company, label: 'Premium/Discount' },
-                  { key: 'nav_per_share' as keyof Company, label: 'NAV/Share' },
+                  { key: 'btc_nav_multiple' as keyof Company, label: 'BTC NAV Multiple' },
+                  { key: 'btc_per_share' as keyof Company, label: 'BTC per Share' },
+                  { key: 'btc_holdings_percentage' as keyof Company, label: 'BTC Holdings %' },
                   { key: 'btc_value' as keyof Company, label: 'BTC Value' },
                   { key: 'market_cap' as keyof Company, label: 'Market Cap' }
                 ].map(({ key, label }) => (
@@ -341,10 +360,13 @@ const BitcoinTreasuryTracker: React.FC = () => {
                     <span className="text-sm font-semibold">${formatNumber(company.stock_price)}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {formatPercent(company.premium)}
+                    <span className="text-sm font-semibold">{formatNumber(company.btc_nav_multiple, 2)}x</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm font-semibold">${formatNumber(company.nav_per_share)}</span>
+                    <span className="text-sm font-semibold">₿{formatNumber(company.btc_per_share, 6)}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm font-semibold">{formatNumber(company.btc_holdings_percentage, 1)}%</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm font-semibold">{formatCurrency(company.btc_value)}</span>
@@ -362,7 +384,7 @@ const BitcoinTreasuryTracker: React.FC = () => {
       {/* Footer */}
       <div className="mt-6 text-center text-sm text-gray-500">
         <p>Data sources: BitcoinTreasuries.net, CoinGecko API, Yahoo Finance API</p>
-        <p>Premium/Discount = (Stock Price - NAV per Share) / NAV per Share × 100</p>
+        <p>BTC NAV Multiple = Market Cap ÷ BTC Holdings Value • BTC per Share = BTC Holdings ÷ Shares Outstanding • BTC Holdings % = (BTC Value ÷ Market Cap) × 100</p>
         <p>⚠️ This is for educational purposes. Always verify data independently before making investment decisions.</p>
         <p className="mt-2">
           Updates every 30 minutes • 

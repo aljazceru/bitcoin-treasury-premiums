@@ -4,8 +4,22 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 15000,
 });
+
+// Add response interceptor for better error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.code === 'ECONNABORTED') {
+      return Promise.reject(new Error('Request timeout - please try again'));
+    }
+    if (!error.response) {
+      return Promise.reject(new Error('Network error - please check your connection'));
+    }
+    return Promise.reject(error);
+  }
+);
 
 export interface Company {
   id?: number;
@@ -18,8 +32,9 @@ export interface Company {
   stock_price?: number;
   market_cap?: number;
   btc_value?: number;
-  nav_per_share?: number;
-  premium?: number;
+  btc_nav_multiple?: number;        // Market cap divided by value of BTC holdings
+  btc_per_share?: number;           // BTC holdings divided by shares outstanding  
+  btc_holdings_percentage?: number; // BTC holdings as a percentage of market cap
   last_holdings_update?: string;
 }
 
