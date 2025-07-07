@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+.env
+*.log
+npm-debug.log*
+.DS_Store
+data/
+*.db
+*.db-journal
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.npm
+.eslintcache
