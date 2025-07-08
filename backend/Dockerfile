@@ -16,6 +16,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Ensure treasuries.csv is present (it should be copied with the source code)
+RUN ls -la /app/treasuries.csv || echo "CSV file not found!"
+
 # Build the application
 RUN npm run build
 
@@ -50,6 +53,7 @@ RUN adduser -S backend -u 1001
 COPY --from=base /app/dist ./dist
 COPY --from=base /app/node_modules ./node_modules
 COPY --from=base /app/package*.json ./
+COPY --from=base /app/treasuries.csv ./
 
 # Create data directory for SQLite database
 RUN mkdir -p /app/data && chown -R backend:nodejs /app/data
