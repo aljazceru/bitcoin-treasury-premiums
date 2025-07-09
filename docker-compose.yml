@@ -12,6 +12,7 @@ services:
       - "${PORT}:3000"
     env_file:
       - .env
+    init: true
     environment:
       - NODE_ENV=${NODE_ENV}
       - DATABASE_PATH=${DATABASE_PATH}

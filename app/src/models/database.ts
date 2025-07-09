@@ -18,6 +18,16 @@ export class Database {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
+    
+    // Try to create database file if it doesn't exist
+    if (!fs.existsSync(this.dbPath)) {
+      try {
+        fs.writeFileSync(this.dbPath, '');
+        logger.info(`Created database file at ${this.dbPath}`);
+      } catch (error) {
+        logger.warn(`Could not create database file: ${error}. Will try at runtime.`);
+      }
+    }
   }
 
   async connect(): Promise<void> {

@@ -5,9 +5,9 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Install system dependencies
-RUN apk add --no-cache libc6-compat wget
+RUN apk add --no-cache libc6-compat wget su-exec
 
-# Use existing user with UID 1000 or create new one
+# Create user and group
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nextjs -u 1001 -G nodejs
 
@@ -27,11 +27,14 @@ RUN npm run build
 RUN mkdir -p data logs && \
     chmod 755 data logs
 
-# Set ownership
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Set ownership of app directory
 RUN chown -R nextjs:nodejs /app
 
-# Switch to non-root user
-USER nextjs
+# Note: We don't switch to nextjs user here - entrypoint will do it
 
 # Expose port
 EXPOSE 3000
@@ -40,12 +43,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
-# Create startup script to ensure database file exists
-RUN echo '#!/bin/sh' > /app/start.sh && \
-    echo 'mkdir -p /app/data /app/logs' >> /app/start.sh && \
-    echo 'touch /app/data/treasury.db' >> /app/start.sh && \
-    echo 'exec npm start' >> /app/start.sh && \
-    chmod +x /app/start.sh
-
-# Start with our custom script
-CMD ["/app/start.sh"]
+# Use the entrypoint script
+ENTRYPOINT ["/entrypoint.sh"]
