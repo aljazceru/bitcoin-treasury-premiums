@@ -9,7 +9,7 @@ services:
         - NODE_ENV=${NODE_ENV}
     container_name: ${COMPOSE_PROJECT_NAME}-app
     ports:
-      - "${FRONTEND_PORT}:3000"
+      - "${PORT}:3000"
     environment:
       - NODE_ENV=${NODE_ENV}
       - DATABASE_PATH=${DATABASE_PATH}
