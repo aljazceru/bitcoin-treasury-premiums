@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-echo "🔧 Setting up Bitcoin Treasury Tracker..."
+echo "Setting up Bitcoin Treasury Tracker..."
 
 # Ensure directories exist
 mkdir -p /app/data /app/logs
@@ -18,8 +18,8 @@ fi
 
 chmod 664 /app/data/treasury.db 2>/dev/null || true
 
-echo "✅ Permissions setup complete"
+echo "Permissions setup complete"
 
 # Switch to nextjs user and start the application
-echo "🚀 Starting Bitcoin Treasury Tracker as nextjs user..."
+echo "Starting Bitcoin Treasury Tracker as nextjs user..."
 exec su-exec nextjs npm start
