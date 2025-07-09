@@ -1,18 +1,17 @@
 version: '3.8'
 
 services:
-  backend:
+  app:
     build:
-      context: ./backend
+      context: ./app
       dockerfile: Dockerfile
       args:
         - NODE_ENV=${NODE_ENV}
-    container_name: ${COMPOSE_PROJECT_NAME}-backend
+    container_name: ${COMPOSE_PROJECT_NAME}-app
     ports:
-      - "${BACKEND_PORT}:${BACKEND_PORT}"
+      - "${FRONTEND_PORT}:3000"
     environment:
       - NODE_ENV=${NODE_ENV}
-      - PORT=${BACKEND_PORT}
       - DATABASE_PATH=${DATABASE_PATH}
       - COINGECKO_API_URL=${COINGECKO_API_URL}
       - YAHOO_FINANCE_API_URL=${YAHOO_FINANCE_API_URL}
@@ -23,47 +22,15 @@ services:
       - HOLDINGS_UPDATE_INTERVAL=${HOLDINGS_UPDATE_INTERVAL}
       - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS}
       - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS}
-      - FRONTEND_URL=${FRONTEND_URL}
+      - DOMAIN=${DOMAIN}
       - LOG_LEVEL=${LOG_LEVEL}
     volumes:
-      - ${BACKEND_DATA_PATH}:/app/data
-      - ${BACKEND_LOGS_PATH}:/app/logs
-    networks:
-      - bitcoin-treasury-network
+      - ${APP_DATA_PATH}:/app/data
+      - ${APP_LOGS_PATH}:/app/logs
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:${BACKEND_PORT}/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: ${HEALTH_CHECK_INTERVAL}
       timeout: ${HEALTH_CHECK_TIMEOUT}
       retries: ${HEALTH_CHECK_RETRIES}
       start_period: ${HEALTH_CHECK_START_PERIOD}
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        - REACT_APP_API_URL=${REACT_APP_API_URL}
-        - NODE_ENV=${NODE_ENV}
-    container_name: ${COMPOSE_PROJECT_NAME}-frontend
-    ports:
-      - "${FRONTEND_PORT}:3000"
-    environment:
-      - REACT_APP_API_URL=${REACT_APP_API_URL}
-      - NODE_ENV=${NODE_ENV}
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - bitcoin-treasury-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
-      interval: ${HEALTH_CHECK_INTERVAL}
-      timeout: ${HEALTH_CHECK_TIMEOUT}
-      retries: ${HEALTH_CHECK_RETRIES}
-      start_period: ${HEALTH_CHECK_START_PERIOD}
-
-networks:
-  bitcoin-treasury-network:
-    driver: bridge
