@@ -25,10 +25,14 @@ export function createApp(): Application {
       credentials: true
     }));
   } else {
-    // Production: Backend is behind reverse proxy, no CORS needed
-    // All requests come from the same domain via nginx
+    // Production: Allow production domain
+    const allowedOrigins = [
+      'https://premiums.cypherpunk.cloud',
+      process.env.FRONTEND_URL
+    ].filter((origin): origin is string => Boolean(origin));
+
     app.use(cors({
-      origin: true, // Accept all origins since requests come through reverse proxy
+      origin: allowedOrigins,
       credentials: true
     }));
   }

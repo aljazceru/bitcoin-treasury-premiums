@@ -60,19 +60,34 @@ export class CSVParser {
       let name = '';
       let ticker = '';
       
-      // Try to extract ticker from the end
-      const tickerMatch = nameAndTicker.match(/([A-Z]{2,8}(?:\.[A-Z]{1,3})?)$/);
-      if (tickerMatch) {
-        ticker = tickerMatch[1];
-        name = nameAndTicker.replace(ticker, '').trim();
-        
-        // Clean up name - remove trailing punctuation and common suffixes
+      // Handle known ticker corrections first
+      const tickerCorrections: { [key: string]: string } = {
+        'Block, Inc.XYZ': 'SQ',  // Block Inc should be SQ, not XYZ
+        'BIT': 'BTBT',  // Common confusion
+      };
+      
+      // Check for exact matches that need correction
+      const correctedTicker = tickerCorrections[nameAndTicker];
+      if (correctedTicker) {
+        ticker = correctedTicker;
+        name = nameAndTicker.replace(/[A-Z]{2,8}(?:\.[A-Z]{1,3})?$/, '').trim();
         name = name.replace(/,?\s*(Inc\.?|Corp\.?|Ltd\.?|LLC|PLC|SE|AG|AB|AS|Group|Holdings?)$/i, '');
         name = name.replace(/,$/, '').trim();
       } else {
-        // If no clear ticker pattern, use the whole field as name
-        name = nameAndTicker.trim();
-        ticker = 'UNKNOWN';
+        // Try to extract ticker from the end
+        const tickerMatch = nameAndTicker.match(/([A-Z]{2,8}(?:\.[A-Z]{1,3})?)$/);
+        if (tickerMatch) {
+          ticker = tickerMatch[1];
+          name = nameAndTicker.replace(ticker, '').trim();
+          
+          // Clean up name - remove trailing punctuation and common suffixes
+          name = name.replace(/,?\s*(Inc\.?|Corp\.?|Ltd\.?|LLC|PLC|SE|AG|AB|AS|Group|Holdings?)$/i, '');
+          name = name.replace(/,$/, '').trim();
+        } else {
+          // If no clear ticker pattern, use the whole field as name
+          name = nameAndTicker.trim();
+          ticker = 'UNKNOWN';
+        }
       }
       
       // Extract country from flag emoji
